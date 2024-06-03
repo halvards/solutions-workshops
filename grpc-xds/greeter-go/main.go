@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:generate protoc --proto_path=third_party/google.golang.org/grpc/examples/helloworld --go_out=third_party --go_opt=paths=import --go-grpc_out=third_party --go-grpc_opt=paths=import helloworld/greeter.proto helloworld/greeter_stream.proto
+
 package main
 
 import (

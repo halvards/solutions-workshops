@@ -29,6 +29,7 @@ import (
 	secretv3 "github.com/envoyproxy/go-control-plane/envoy/service/secret/v3"
 	serverv3 "github.com/envoyproxy/go-control-plane/pkg/server/v3"
 	"github.com/go-logr/logr"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/admin"
 	"google.golang.org/grpc/credentials"
@@ -48,7 +49,7 @@ import (
 	"github.com/googlecloudplatform/solutions-workshops/grpc-xds/control-plane-go/pkg/xds"
 )
 
-// gRPC configuration based on https://github.com/envoyproxy/go-control-plane/blob/v0.11.1/internal/example/server.go
+// gRPC configuration based on https://github.com/envoyproxy/go-control-plane/blob/v0.12.0/internal/example/server.go
 const (
 	grpcKeepaliveTime        = 30 * time.Second
 	grpcKeepaliveTimeout     = 5 * time.Second
@@ -207,8 +208,8 @@ func createInformers(ctx context.Context, logger logr.Logger, kubecontexts []inf
 // Source: https://github.com/envoyproxy/go-control-plane/blob/v0.11.1/internal/example/server.go#L67
 func serverOptions(logger logr.Logger, transportCredentials credentials.TransportCredentials) []grpc.ServerOption {
 	return []grpc.ServerOption{
-		grpc.ChainStreamInterceptor(interceptors.StreamServerLogging(logger)),
-		grpc.ChainUnaryInterceptor(interceptors.UnaryServerLogging(logger)),
+		grpc.ChainStreamInterceptor(interceptors.StreamServerLogging(logger), recovery.StreamServerInterceptor()),
+		grpc.ChainUnaryInterceptor(interceptors.UnaryServerLogging(logger), recovery.UnaryServerInterceptor()),
 		grpc.Creds(transportCredentials),
 		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
 			MinTime:             grpcKeepaliveMinTime,

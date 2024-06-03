@@ -19,9 +19,12 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	helloworldpb "google.golang.org/grpc/examples/helloworld/helloworld"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/orca"
+	"google.golang.org/grpc/status"
 
 	"github.com/googlecloudplatform/solutions-workshops/grpc-xds/greeter-go/pkg/logging"
+	helloworldpb "github.com/googlecloudplatform/solutions-workshops/grpc-xds/greeter-go/third_party/google.golang.org/grpc/examples/helloworld/helloworld"
 )
 
 // leafService implements helloworld.Greeter.
@@ -38,7 +41,12 @@ func NewLeafService(ctx context.Context, name string) helloworldpb.GreeterServer
 	}
 }
 
-func (s *leafService) SayHello(_ context.Context, request *helloworldpb.HelloRequest) (*helloworldpb.HelloReply, error) {
+func (s *leafService) SayHello(ctx context.Context, request *helloworldpb.HelloRequest) (*helloworldpb.HelloReply, error) {
 	s.logger.V(2).Info("Received request, returning greeting", "name", request.Name)
+	cmr := orca.CallMetricsRecorderFromContext(ctx)
+	if cmr == nil {
+		return nil, status.Errorf(codes.Internal, "unable to retrieve call metrics recorder (missing ORCA ServerOption?)")
+	}
+	cmr.SetNamedMetric("leaf", 2)
 	return &helloworldpb.HelloReply{Message: fmt.Sprintf("Hello %s, from %s", request.Name, s.name)}, nil
 }

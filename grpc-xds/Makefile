@@ -165,7 +165,7 @@ request-leaf-mtls: check-grpcurl certs/ca_certificates.pem
 # Port forwarding must be running. Verify that the port in the command below matches the local forwarded port.
 .PHONY: request-mtls-noverify
 request-mtls-noverify: check-grpcurl certs/ca_certificates.pem
-	grpcurl -proto ./greeter-java/third_party/src/main/proto/helloworld/helloworld.proto -insecure -cacert ./certs/ca_certificates.pem -cert ./certs/certificates.pem -key ./certs/private_key.pem -d '{"name": "World"}' dns:///localhost:50055 helloworld.Greeter/SayHello
+	grpcurl -v -import-path . -import-path /usr/local/google/home/halvard/src/github.com/cncf/xds -import-path /usr/local/google/home/halvard/src/github.com/protocolbuffers/protobuf/src -import-path /usr/local/google/home/halvard/src/github.com/bufbuild/protoc-gen-validate -proto /usr/local/google/home/halvard/src/github.com/cncf/xds/xds/data/orca/v3/orca_load_report.proto -proto ./greeter-java/third_party/src/main/proto/helloworld/helloworld.proto -insecure -cacert ./certs/ca_certificates.pem -cert ./certs/certificates.pem -key ./certs/private_key.pem -d '{"name": "World"}' dns:///localhost:50055 helloworld.Greeter/SayHello
 
 # request-leaf-mtls-noverify sends an mTLS request to the greeter-leaf server using the DNS resolver,
 # with certificate validation turned off. Use this target with GKE workload TLS certificates,

@@ -23,7 +23,7 @@ export SKAFFOLD_SKIP_TESTS:=true
 export SKAFFOLD_UPDATE_CHECK:=false
 
 .PHONY: all
-all: clean proto format lint test
+all: clean format lint test
 
 # run builds and deploys both greeter-intermediary and greeter-leaf and sets up port forwarding.
 .PHONY: run
@@ -125,7 +125,7 @@ manifests:
 	skaffold render --digest-source=local --loud=false
 
 .PHONY: proto
-proto:
+proto: check-protoc check-protoc-gen-go check-protoc-gen-go-grpc
 	go generate $(PKG)/...
 
 .PHONY: test
@@ -135,3 +135,24 @@ test:
 .PHONY: updatedeps
 updatedeps:
 	go get -d -t -u $(PKG)/...
+
+.PHONY: check-protoc
+check-protoc:
+	@if which protoc > /dev/null; then \
+		echo "error: protoc is not installed, see https://grpc.io/docs/protoc-installation/" >&2; \
+		exit 1; \
+	fi
+
+.PHONY: check-protoc-gen-go
+check-protoc-gen-go:
+	@if ! which protoc-gen-go > /dev/null; then \
+		echo "error: protoc-gen-go is not installed, run \"go install google.golang.org/protobuf/cmd/protoc-gen-go@latest\" to install" >&2; \
+		exit 1; \
+	fi
+
+.PHONY: check-protoc-gen-go-grpc
+check-protoc-gen-go-grpc:
+	@if ! which protoc-gen-go-grpc > /dev/null; then \
+		echo "error: protoc-gen-go-grpc is not installed, run \"go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest\" to install" >&2; \
+		exit 1; \
+	fi

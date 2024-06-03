@@ -21,12 +21,13 @@ import (
 	"github.com/go-logr/logr"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
-	helloworldpb "google.golang.org/grpc/examples/helloworld/helloworld"
+	"google.golang.org/grpc/orca"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/googlecloudplatform/solutions-workshops/grpc-xds/greeter-go/pkg/logging"
+	helloworldpb "github.com/googlecloudplatform/solutions-workshops/grpc-xds/greeter-go/third_party/google.golang.org/grpc/examples/helloworld/helloworld"
 )
 
 // intermediaryService implements helloworld.Greeter.
@@ -47,6 +48,11 @@ func NewIntermediaryService(ctx context.Context, name string, greeterClient *Cli
 
 func (s *intermediaryService) SayHello(ctx context.Context, request *helloworldpb.HelloRequest) (*helloworldpb.HelloReply, error) {
 	s.logger.V(2).Info("Received request, forwarding to the next hop", "name", request.Name)
+	cmr := orca.CallMetricsRecorderFromContext(ctx)
+	if cmr == nil {
+		return nil, status.Errorf(codes.Internal, "unable to retrieve call metrics recorder (missing ORCA ServerOption?)")
+	}
+	cmr.SetNamedMetric("intermediary", 1)
 	intermediaryMessage, err := s.greeterClient.SayHello(ctx, request.GetName())
 	if err != nil {
 		logGreeterError(s.logger, err, "Greeting request failed, returning error code internal")

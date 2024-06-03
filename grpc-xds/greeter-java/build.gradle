@@ -98,13 +98,13 @@ tasks.withType(Checkstyle) {
 }
 
 def errorProneCoreVersion = '2.27.1'
-def grpcVersion = '1.63.0'
-def gsonVersion = '2.10.1'
+def grpcVersion = '1.64.0'
+def gsonVersion = '2.11.0'
 def jetbrainsAnnotationsVersion = '24.1.0'
 def junitJupiterVersion = '5.10.2'
 def junitVersion = '4.13.2'
 def log4jVersion = '2.23.1'
-def protobufVersion = '3.25.3'
+def protobufVersion = '3.25.3' // v4.x is currently incompatible with gRPC-Java, see https://github.com/grpc/grpc-java/issues/11015
 def slf4jVersion = '2.0.13'
 def tomcatAnnotationsApiVersion = '6.0.53'
 

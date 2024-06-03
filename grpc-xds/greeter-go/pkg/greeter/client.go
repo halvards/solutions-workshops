@@ -16,19 +16,23 @@ package greeter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"time"
 
+	orcav3 "github.com/cncf/xds/go/xds/data/orca/v3"
 	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	xdscredentials "google.golang.org/grpc/credentials/xds"
-	helloworldpb "google.golang.org/grpc/examples/helloworld/helloworld"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/googlecloudplatform/solutions-workshops/grpc-xds/greeter-go/pkg/interceptors"
 	"github.com/googlecloudplatform/solutions-workshops/grpc-xds/greeter-go/pkg/logging"
+	helloworldpb "github.com/googlecloudplatform/solutions-workshops/grpc-xds/greeter-go/third_party/google.golang.org/grpc/examples/helloworld/helloworld"
 )
 
 const (
@@ -36,7 +40,10 @@ const (
 	grpcClientKeepaliveTime    = 30 * time.Second
 	grpcClientKeepaliveTimeout = 5 * time.Second
 	grpcClientIdleTimeout      = math.MaxInt64 // good idea?
+	TrailerMetadataKey         = "endpoint-load-metrics-bin"
 )
+
+var errMultipleORCALoadReportsInMetadata = errors.New("multiple ORCA load reports found in provided metadata")
 
 type Client struct {
 	logger  logr.Logger
@@ -50,9 +57,7 @@ func NewClient(ctx context.Context, nextHop string, useXDSCredentials bool) (*Cl
 	if err != nil {
 		return nil, fmt.Errorf("could not configure greeter client connection dial options: %w", err)
 	}
-	dialCtx, dialCancel := context.WithTimeout(ctx, grpcClientDialTimeout)
-	defer dialCancel()
-	clientConn, err := grpc.DialContext(dialCtx, nextHop, dialOpts...)
+	clientConn, err := grpc.NewClient(nextHop, dialOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("could not create a virtual connection to target=%s: %w", nextHop, err)
 	}
@@ -64,12 +69,40 @@ func NewClient(ctx context.Context, nextHop string, useXDSCredentials bool) (*Cl
 	}, nil
 }
 
+// ToLoadReport extracts a binary ORCA load report from the trailer metadata,
+// using the metadata key "endpoint-load-metrics-bin". Returns a nil report
+// reference and nil error if there was no load report in the metadata map.
+// This function was adapted from
+// https://github.com/grpc/grpc-go/blob/48b6b11b388f4b26e03fa722dd6ed60ae27a0fa7/orca/internal/internal.go#L49-L71
+// Copyright 2022 gRPC authors. Licensed under the Apache License, Version 2.0.
+func ToLoadReport(md metadata.MD) (*orcav3.OrcaLoadReport, error) {
+	loadMetrics := md.Get(TrailerMetadataKey)
+	if len(loadMetrics) == 0 {
+		return nil, nil
+	}
+	if len(loadMetrics) > 1 {
+		return nil, errMultipleORCALoadReportsInMetadata
+	}
+	loadReport := &orcav3.OrcaLoadReport{}
+	if err := proto.Unmarshal([]byte(loadMetrics[0]), loadReport); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal ORCA load report found in metadata: %w", err)
+	}
+	return loadReport, nil
+}
+
+// SayHello implements helloworld.Greeter/SayHello.
 func (c *Client) SayHello(requestCtx context.Context, name string) (string, error) {
-	resp, err := c.client.SayHello(requestCtx, &helloworldpb.HelloRequest{Name: name}, grpc.WaitForReady(true))
+	var header, trailer metadata.MD
+	resp, err := c.client.SayHello(requestCtx, &helloworldpb.HelloRequest{Name: name}, grpc.WaitForReady(true), grpc.Header(&header), grpc.Trailer(&trailer))
 	if err != nil {
 		return "", fmt.Errorf("could not greet name=%s at target=%s: %w", name, c.nextHop, err)
 	}
-	return resp.GetMessage(), nil
+	_ = header
+	loadReport, err := ToLoadReport(trailer)
+	if err != nil {
+		return "", fmt.Errorf("could not get load report: %w", err)
+	}
+	return resp.GetMessage() + " " + loadReport.String(), nil
 }
 
 // dialOptions sets parameters for client connection establishment.

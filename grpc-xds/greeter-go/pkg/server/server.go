@@ -21,25 +21,27 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/admin"
 	channelzservice "google.golang.org/grpc/channelz/service"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	xdscredentials "google.golang.org/grpc/credentials/xds"
-	helloworldpb "google.golang.org/grpc/examples/helloworld/helloworld"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/orca"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/xds"
 
 	"github.com/googlecloudplatform/solutions-workshops/grpc-xds/greeter-go/pkg/greeter"
 	"github.com/googlecloudplatform/solutions-workshops/grpc-xds/greeter-go/pkg/interceptors"
 	"github.com/googlecloudplatform/solutions-workshops/grpc-xds/greeter-go/pkg/logging"
+	helloworldpb "github.com/googlecloudplatform/solutions-workshops/grpc-xds/greeter-go/third_party/google.golang.org/grpc/examples/helloworld/helloworld"
 )
 
-// gRPC configuration based on https://github.com/envoyproxy/go-control-plane/blob/v0.11.1/internal/example/server.go
+// gRPC configuration based on https://github.com/envoyproxy/go-control-plane/blob/v0.12.0/internal/example/server.go
 const (
 	grpcKeepaliveTime        = 30 * time.Second
 	grpcKeepaliveTimeout     = 5 * time.Second
@@ -121,8 +123,9 @@ func configureServerOptions(logger logr.Logger, useXDSCredentials bool, healthSe
 		}
 	}
 	return []grpc.ServerOption{
-		grpc.ChainStreamInterceptor(interceptors.StreamServerLogging(logger)),
-		grpc.ChainUnaryInterceptor(interceptors.UnaryServerLogging(logger)),
+		orca.CallMetricsServerOption(nil), // ORCA should be the first server option
+		grpc.ChainStreamInterceptor(interceptors.StreamServerLogging(logger), recovery.StreamServerInterceptor()),
+		grpc.ChainUnaryInterceptor(interceptors.UnaryServerLogging(logger), recovery.UnaryServerInterceptor()),
 		grpc.Creds(serverCredentials),
 		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
 			MinTime:             grpcKeepaliveMinTime,
